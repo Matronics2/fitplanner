@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FitPlanner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f6fed">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7480;--bd:#e1e4e8;--ac:#2f6fed;--ac2:#18a058;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--card:#1d2126;--tx:#e8eaed;--mu:#9aa3ad;--bd:#2d333a;--ac:#6b9bff;--ac2:#3ec47e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171a;--card:#1d2126;--tx:#e8eaed;--mu:#9aa3ad;--bd:#2d333a;--ac:#6b9bff;--ac2:#3ec47e;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:12px}
+nav{display:flex;gap:6px;margin-bottom:12px}
+nav button{flex:1;padding:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.two{grid-template-columns:1fr}}
+.hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.hd h2{margin:0;font-size:17px}
+.hd button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}
+.btn.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;color:var(--mu);font-size:12px}
+.d{aspect-ratio:1;border:1px solid var(--bd);border-radius:8px;background:none;color:var(--tx);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.d.o{opacity:.4}.d.t{border-color:var(--ac);font-weight:700}.d.s{background:var(--ac);color:#fff}
+.dots{display:flex;gap:3px;height:6px}.dots i{width:6px;height:6px;border-radius:50%;background:var(--ac)}.dots i.g{background:var(--ac2)}
+.d.s .dots i{background:#fff}
+textarea,input,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px;font:inherit}
+textarea{min-height:110px;resize:vertical}
+h3{margin:14px 0 6px;font-size:14px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}
+.li span{flex:1}.li input[type=checkbox]{width:18px;height:18px}
+.done{text-decoration:line-through;color:var(--mu)}
+.x{background:none;border:none;color:var(--mu);cursor:pointer;font-size:18px;width:auto;padding:0 4px}
+.mu{color:var(--mu);font-size:13px}
+.stat{display:flex;gap:10px;margin:10px 0}.stat div{flex:1;background:var(--bg);border-radius:10px;padding:8px;text-align:center}.stat b{display:block;font-size:20px}
+svg{width:100%;height:auto}
+.hide{display:none}
+</style></head><body><main>
+<nav><button id="n-cal" onclick="go('cal')">Calendar</button><button id="n-notes" onclick="go('notes')">Notes</button><button id="n-prog" onclick="go('prog')">Progress</button></nav>
+
+<section id="v-cal" class="two">
+  <div class="card"><div class="hd"><button onclick="mv(-1)">‹</button><h2 id="mt"></h2><button onclick="mv(1)">›</button></div><div class="grid" id="cal"></div></div>
+  <div class="card" id="day"></div>
+</section>
+
+<section id="v-notes" class="hide"><div class="card"><div class="hd"><h2>Notes &amp; plans</h2><button class="btn p" onclick="addNote()">+ New note</button></div><div id="nl"></div></div></section>
+
+<section id="v-prog" class="hide"><div class="card"><div class="hd"><h2>Progress</h2></div><select id="ex" onchange="renderProg()"></select><div id="pg"></div></div></section>
+<div class="card" style="margin-top:12px"><div class="row" style="margin:0"><span class="mu" style="flex:1">Backup your data (JSON file)</span><button class="btn" onclick="exp()">Export</button><button class="btn" onclick="$('impf').click()">Import</button><input id="impf" type="file" accept=".json,application/json" class="hide" onchange="importData(this)"></div></div>
+</main>
+<script>
+const KEY='fitplanner.v1';
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.days)S={days:{},notes:[]};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const k=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id);
+const today=new Date();let cur=new Date(today.getFullYear(),today.getMonth(),1),sel=k(today);
+const D=key=>S.days[key]||(S.days[key]={note:'',todos:[],lifts:[]});
+
+function go(v){['cal','notes','prog'].forEach(x=>{$('v-'+x).classList.toggle('hide',x!==v);$('n-'+x).classList.toggle('on',x===v)});
+  if(v==='cal'){renderCal();renderDay()}if(v==='notes')renderNotes();if(v==='prog')renderProg()}
+function mv(n){cur=new Date(cur.getFullYear(),cur.getMonth()+n,1);renderCal()}
+
+function renderCal(){
+  $('mt').textContent=cur.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  let h=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="dow">${d}</div>`).join('');
+  const off=(cur.getDay()+6)%7,start=new Date(cur.getFullYear(),cur.getMonth(),1-off);
+  for(let i=0;i<42;i++){
+    const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i),key=k(d),x=S.days[key];
+    const a=x&&(x.note.trim()||x.todos.length),g=x&&x.lifts.length;
+    h+=`<button class="d${d.getMonth()!==cur.getMonth()?' o':''}${key===k(today)?' t':''}${key===sel?' s':''}" onclick="pick('${key}')">${d.getDate()}<span class="dots">${a?'<i></i>':''}${g?'<i class="g"></i>':''}</span></button>`;
+  }
+  $('cal').innerHTML=h;
+}
+function pick(key){sel=key;editL=-1;renderCal();renderDay()}
+
+function renderDay(){
+  const x=D(sel),dt=new Date(sel+'T12:00:00');
+  const ex=[...new Set(Object.values(S.days).flatMap(d=>d.lifts.map(l=>l.ex)))];
+  $('day').innerHTML=`<div class="hd"><h2>${dt.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h2><button onclick="cp()">Copy day</button></div>${pasteBar()}
+  <textarea id="nt" placeholder="Notes and plan for this day…" oninput="D(sel).note=this.value;save();renderCal()">${esc(x.note)}</textarea>
+  <h3>Checklist</h3>
+  ${x.todos.map((t,i)=>`<div class="li"><input type="checkbox" ${t.d?'checked':''} onchange="tg(${i})"><span class="${t.d?'done':''}">${esc(t.t)}</span><button class="x" onclick="rt(${i})">×</button></div>`).join('')}
+  <div class="row" style="margin-top:8px"><input id="ti" placeholder="Add a task" onkeydown="if(event.key==='Enter')at()"><button class="btn" onclick="at()">Add</button></div>
+  <h3>Gym log</h3>
+  ${x.lifts.map((l,i)=>i===editL?`<div class="li" style="display:block"><div class="row"><input id="ee" list="dl" value="${esc(l.ex)}"></div><div class="row"><input id="es" type="number" value="${l.sets}"><input id="er" type="number" value="${l.reps}"><input id="ew" type="number" step="0.5" value="${l.w}"></div><div class="row"><input id="en" placeholder="Note" value="${esc(l.n||'')}"></div><div class="row"><button class="btn p" onclick="sl2(${i})">Save</button><button class="btn" onclick="editL=-1;renderDay()">Cancel</button></div></div>`:`<div class="li"><span><b>${esc(l.ex)}</b> <span class="mu">${l.sets}×${l.reps} @ ${l.w} kg</span>${l.n?`<br><span class="mu">${esc(l.n)}</span>`:''}</span><button class="x" title="Edit" onclick="editL=${i};renderDay()">✎</button><button class="x" onclick="rl(${i})">×</button></div>`).join('')}
+  <datalist id="dl">${ex.map(e=>`<option value="${esc(e)}">`).join('')}</datalist>
+  <div class="row" style="margin-top:8px"><input id="le" list="dl" placeholder="Exercise"></div>
+  <div class="row"><input id="ln" placeholder="Note (optional)"></div>
+  <div class="row"><input id="ls" type="number" min="1" placeholder="Sets"><input id="lr" type="number" min="1" placeholder="Reps"><input id="lw" type="number" min="0" step="0.5" placeholder="kg"><button class="btn p" onclick="al()">Add</button></div>`;
+}
+function at(){const v=$('ti').value.trim();if(!v)return;D(sel).todos.push({t:v,d:0});save();renderDay();renderCal();$('ti').focus()}
+function tg(i){const t=D(sel).todos[i];t.d=t.d?0:1;save();renderDay()}
+function rt(i){D(sel).todos.splice(i,1);save();renderDay();renderCal()}
+function al(){const e=$('le').value.trim(),s=+$('ls').value,r=+$('lr').value,w=+$('lw').value||0;if(!e||!s||!r)return;
+  D(sel).lifts.push({ex:e,sets:s,reps:r,w,n:$('ln').value.trim()});save();renderDay();renderCal()}
+function rl(i){D(sel).lifts.splice(i,1);save();renderDay();renderCal()}
+
+let editL=-1;
+function sl2(i){const e=$('ee').value.trim(),s=+$('es').value,r=+$('er').value;if(!e||!s||!r)return;Object.assign(D(sel).lifts[i],{ex:e,sets:s,reps:r,w:+$('ew').value||0,n:$('en').value.trim()});editL=-1;save();renderDay()}
+function jump(d,i){sel=d;cur=new Date(+d.slice(0,4),+d.slice(5,7)-1,1);editL=i;go('cal')}
+function pasteBar(){const c=S.clip;if(!c)return '';return `<div class="mu" style="margin-bottom:8px">Copied from ${c.from}. Paste: <button class="btn" onclick="ps('note')">Notes</button> <button class="btn" onclick="ps('todos')">Checklist</button> <button class="btn" onclick="ps('lifts')">Gym log</button> <button class="btn p" onclick="ps('all')">All</button></div>`}
+function cp(){const x=D(sel);S.clip={from:sel,note:x.note,todos:x.todos.map(t=>({t:t.t,d:0})),lifts:x.lifts.map(l=>({...l}))};save();renderDay()}
+function ps(w){const c=S.clip,x=D(sel);if(!c)return;if((w==='note'||w==='all')&&c.note)x.note=(x.note?x.note+'\n\n':'')+c.note;if(w==='todos'||w==='all')x.todos.push(...c.todos.map(t=>({...t})));if(w==='lifts'||w==='all')x.lifts.push(...c.lifts.map(l=>({...l})));save();renderDay();renderCal()}
+function renderNotes(){
+  $('nl').innerHTML=S.notes.length?S.notes.map((n,i)=>`<div style="margin-bottom:14px"><div class="row"><input placeholder="Title" value="${esc(n.title)}" oninput="S.notes[${i}].title=this.value;save()"><button class="x" onclick="delNote(${i})">×</button></div><textarea oninput="S.notes[${i}].body=this.value;save()" placeholder="Write a plan, routine, ideas…">${esc(n.body)}</textarea></div>`).join(''):'<p class="mu">No notes yet. Add a training plan, a routine or anything you want to keep.</p>';
+}
+function addNote(){S.notes.unshift({title:'',body:''});save();renderNotes()}
+function delNote(i){if(confirm('Delete this note?')){S.notes.splice(i,1);save();renderNotes()}}
+
+function renderProg(){
+  const all=Object.entries(S.days).sort().flatMap(([d,x])=>x.lifts.map((l,i)=>({d,i,...l})));
+  const names=[...new Set(all.map(l=>l.ex))],sl=$('ex'),prev=sl.value;
+  sl.innerHTML=names.map(n=>`<option>${esc(n)}</option>`).join('');
+  if(!names.length){$('pg').innerHTML='<p class="mu">Log exercises in the calendar (day → Gym log) to see your progress here.</p>';return}
+  if(names.includes(prev))sl.value=prev;
+  const L=all.filter(l=>l.ex===sl.value),by={};L.forEach(l=>by[l.d]=Math.max(by[l.d]||0,l.w));
+  const pts=Object.entries(by),vals=pts.map(p=>p[1]),mx=Math.max(...vals),mn=Math.min(...vals),rg=(mx-mn)||1;
+  const xy=pts.map((p,i)=>[20+(pts.length>1?i*(280/(pts.length-1)):140),115-((p[1]-mn)/rg)*90]);
+  const vol=L.reduce((a,l)=>a+l.sets*l.reps*l.w,0);
+  $('pg').innerHTML=`<div class="stat"><div><b>${mx} kg</b><span class="mu">Best</span></div><div><b>${pts.length}</b><span class="mu">Sessions</span></div><div><b>${Math.round(vol)}</b><span class="mu">Total volume</span></div></div>
+  <svg viewBox="0 0 320 140"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${xy.map(p=>p.join(',')).join(' ')}"/>${xy.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--ac)"/>`).join('')}<text x="2" y="14" font-size="10" fill="var(--mu)">${mx}</text><text x="2" y="132" font-size="10" fill="var(--mu)">${mn}</text></svg>
+  <h3>History</h3>${L.slice().reverse().map(l=>`<div class="li"><span>${l.d}${l.n?`<br><span class="mu">${esc(l.n)}</span>`:''}</span><span class="mu" style="text-align:right">${l.sets}×${l.reps} @ ${l.w} kg</span><button class="x" title="Edit" onclick="jump('${l.d}',${l.i})">✎</button></div>`).join('')}`;
+}
+function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='fitplanner-backup-'+k(new Date())+'.json';a.click()}
+function importData(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.days||!Array.isArray(d.notes))throw 0;if(!confirm('Replace all current data with this backup?')){el.value='';return}S=d;save();go('cal')}catch(e){alert('This file is not a valid FitPlanner backup.')}el.value=''};r.readAsText(f)}
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+go('cal');
+</script></body></html>
