@@ -1,5 +1,5 @@
 // FitPlanner service worker: network first, falls back to cache when offline.
-const V = 'fitplanner-v1';
+const V = 'fitplanner-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
